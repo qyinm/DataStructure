@@ -1,7 +1,7 @@
 # 자료구조
 자료구조 수업 및 개인 구현 upload용
 ## 과제 모음!
-### [과제1](/assignments1)
+### [과제1](/Assignments1)
 k-means 알고리즘 구현
 
 ---

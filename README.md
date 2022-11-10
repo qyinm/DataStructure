@@ -11,3 +11,6 @@ k-means 알고리즘 구현
 
 ### [Heap](/Heap)
 힙 자료구조 c 구현
+
+### [MergeSort](/MergeSort)
+병합 정렬 알고리즘 c++

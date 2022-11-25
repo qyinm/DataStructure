@@ -1,10 +1,8 @@
+// 학번 : 22112044    이름 : 변승우
 #define _CRT_SECURE_NO_WARNINGS
-
-#include <math.h>
-#include <stdio.h>
-#include <stdlib.h>
-
-int countData;
+#include <iostream>
+#include <cstdlib>
+#include <cstring>
 
 typedef struct Data {
     int startTime;
@@ -17,12 +15,7 @@ typedef struct SumFIFO {
     int allWaitTime;
 } SumFIFO;
 
-typedef struct Queue {
-    Data element;
-    Queue* link;
-} Queue;
-
-typedef struct HeapData: Data{
+typedef struct HeapData : Data {
     int lastTime;
 } HeapData;
 
@@ -37,10 +30,8 @@ typedef struct PriorityData {
     int numOfPriority;
 } PriorityData;
 
-Queue* originalDataQueue;
-SumFIFO sumFIFO;
 int dataLen;
-
+Data* originalData;
 
 void readFile() {
     printf("입력파일 이름? ");
@@ -54,16 +45,11 @@ void readFile() {
     }
     fscanf(fp, "%d", &dataLen);
 
-    originalDataQueue = (Queue*)malloc(sizeof(Queue));
-    originalDataQueue->link = NULL;
-    Queue* queuePtr = originalDataQueue;
-    for (int i = 0; i < dataLen; i++) {
-        fscanf(fp, "%d %d %d", &queuePtr->element.startTime, &queuePtr->element.executeTime,
-            &queuePtr->element.priority);
+    originalData = (Data*)malloc(sizeof(Data) * dataLen);
 
-        queuePtr->link = (Queue*)malloc(sizeof(Queue));
-        queuePtr = queuePtr->link;
-        queuePtr->link = NULL;
+    for (int i = 0; i < dataLen; i++) {
+        fscanf(fp, "%d %d %d", &originalData[i].startTime, &originalData[i].executeTime,
+            &originalData[i].priority);
     }
 
     fclose(fp);
@@ -71,36 +57,39 @@ void readFile() {
 }
 
 void FIFOScheduling() {
-    int time = originalDataQueue->element.startTime;
-    Queue fifoPtr = *originalDataQueue;
-
-    for (int start_time = time; fifoPtr.link != NULL; ++time) {
-        if (fifoPtr.element.executeTime == 0) {
-            sumFIFO.allWaitTime += start_time - fifoPtr.element.startTime;
-            sumFIFO.allExecuteTime += time - fifoPtr.element.startTime;
-
-            fifoPtr = *fifoPtr.link;
+    int time = originalData[0].startTime;
+    Data* fifoPtr = new Data [dataLen];
+    memcpy(fifoPtr, originalData, sizeof(Data) * dataLen);
+    SumFIFO sumFIFO = { 0 };
+    int i = 0;
+    for (int start_time = time; i < dataLen; ++time) {
+        if (fifoPtr[i].executeTime == 0) {
+            sumFIFO.allWaitTime += start_time - fifoPtr[i].startTime;
+            sumFIFO.allExecuteTime += time - fifoPtr[i].startTime;
             start_time = time;
+            ++i;
         }
-        fifoPtr.element.executeTime--;
+        --fifoPtr[i].executeTime;
     }
 
 
-    printf("FIFO Scheduling의 실행 결과:\n작업수 = %d, 종료시간 = %d, 평균 실행시간 = %.2lf, 평균 대기시간 = %.2lf\n", dataLen, time - 1,
+    printf("FIFO Scheduling의 실행 결과:\n\t작업수 = %d, 종료시간 = %d, 평균 실행시간 = %.2lf, 평균 대기시간 = %.2lf\n", dataLen, time - 1,
         (double)sumFIFO.allExecuteTime / dataLen,
         (double)sumFIFO.allWaitTime / dataLen);
+
+    delete []fifoPtr;
 }
 
 Heap* HeapInit() {
-    Heap* heap = (Heap*)malloc(sizeof(Heap));
+    Heap* heap = new Heap;
     heap->numOfData = 0;
-    heap->heapArr = (HeapData*)malloc(sizeof(HeapData) * (long long)pow(2, log2(dataLen) + 2));
+    heap->heapArr = new HeapData[dataLen];
 
     return heap;
 }
 
 /** 1 : a 0 : b */
-int HeapCmp(Data heapDataA, Data heapDataB) {
+int HeapCmp(const Data &heapDataA, const Data &heapDataB) {
     if (heapDataA.priority > heapDataB.priority) {
         return 1;
     }
@@ -128,11 +117,11 @@ int HeapCmp(Data heapDataA, Data heapDataB) {
     return 0;
 }
 
-void HeapInsert(Heap** root, Data heapData) {
-    int insertIdx = (*root)->numOfData + 1;
+void HeapInsert(Heap* (&root), Data heapData) {
+    int insertIdx = root->numOfData + 1;
     while (insertIdx != 1) {
-        if (HeapCmp(heapData, (*root)->heapArr[insertIdx / 2])) {
-            (*root)->heapArr[insertIdx] = (*root)->heapArr[insertIdx / 2];
+        if (HeapCmp(heapData, root->heapArr[insertIdx / 2])) {
+            root->heapArr[insertIdx] = root->heapArr[insertIdx / 2];
             insertIdx /= 2;
         }
         else {
@@ -140,11 +129,11 @@ void HeapInsert(Heap** root, Data heapData) {
         }
     }
 
-    (*root)->heapArr[insertIdx].executeTime = heapData.executeTime;
-    (*root)->heapArr[insertIdx].priority = heapData.priority;
-    (*root)->heapArr[insertIdx].startTime = heapData.startTime;
-    (*root)->heapArr[insertIdx].lastTime = heapData.startTime;
-    (*root)->numOfData += 1;
+    root->heapArr[insertIdx].executeTime = heapData.executeTime;
+    root->heapArr[insertIdx].priority = heapData.priority;
+    root->heapArr[insertIdx].startTime = heapData.startTime;
+    root->heapArr[insertIdx].lastTime = heapData.startTime;
+    root->numOfData += 1;
 }
 
 int GetPriorityChildIdx(Heap* root, int parentIdx) {
@@ -164,15 +153,14 @@ int GetPriorityChildIdx(Heap* root, int parentIdx) {
     }
 }
 
-void HeapDelete(Heap** root) {
-    HeapData deleteData = (*root)->heapArr[1];
-    HeapData lastData = (*root)->heapArr[(*root)->numOfData];
+void HeapDelete(Heap *(&root)) {
+    HeapData lastData = root->heapArr[root->numOfData];
 
     int parentIdx = 1;
     int childIdx;
-    while (childIdx = GetPriorityChildIdx(*root, parentIdx)) {
-        if (HeapCmp((*root)->heapArr[childIdx], lastData)) {
-            (*root)->heapArr[parentIdx] = (*root)->heapArr[childIdx];
+    while (childIdx = GetPriorityChildIdx(root, parentIdx)) {
+        if (HeapCmp(root->heapArr[childIdx], lastData)) {
+            root->heapArr[parentIdx] = root->heapArr[childIdx];
             parentIdx = childIdx;
         }
         else {
@@ -180,64 +168,70 @@ void HeapDelete(Heap** root) {
         }
     }
 
-    (*root)->heapArr[parentIdx] = lastData;
-    (*root)->numOfData -= 1;
+    root->heapArr[parentIdx] = lastData;
+    root->numOfData -= 1;
 }
 
+void ChangeRootNodeHandler(Heap *(& heap), PriorityData *(&priorityData), const int& time, int& prevRootNodeStartTime) {
+    if (prevRootNodeStartTime != heap->heapArr[1].startTime) {
+        priorityData[heap->heapArr[1].priority].waitTime += time - heap->heapArr[1].lastTime;
+        prevRootNodeStartTime = heap->heapArr[1].startTime;
+    }
+}
 
-void PriorityQueue() {
-    //    PriorityData *priorityData = (PriorityData *) malloc(sizeof(PriorityData) * (dataLen + 1));
-    PriorityData priorityData[11] = { {0, 0, 0}, };
+void PriorityScheduling() {
+    PriorityData* priorityData = new PriorityData[11];
+    memset(priorityData, 0, sizeof(PriorityData) * (11));
+    
     Heap* heap = HeapInit();
-    Queue originalPtr = *originalDataQueue;
-   
 
+    Data * dataPtr = originalData;
 
-    int time = originalDataQueue->element.startTime;
-    HeapInsert(&heap, originalPtr.element);
-    originalPtr = *originalPtr.link;
+    int time = originalData[0].startTime;
+    HeapInsert(heap, originalData[0]);
 
     int prevRootNodeStartTime = heap->heapArr[1].startTime;
-    for (; heap->numOfData != 0; ++time, --(heap->heapArr[1].executeTime)) {
+
+    for (int i = 1; heap->numOfData != 0; ++time, --heap->heapArr[1].executeTime) {
         if (heap->heapArr[1].executeTime == 0) {
             priorityData[heap->heapArr[1].priority].numOfPriority += 1;
             priorityData[0].executeTime += time - heap->heapArr[1].startTime;
-            HeapDelete(&heap);
-            if (prevRootNodeStartTime != heap->heapArr[1].startTime) {
-                priorityData[heap->heapArr[1].priority].waitTime += time - heap->heapArr[1].lastTime;
-                prevRootNodeStartTime = heap->heapArr[1].startTime;
-            }
+            HeapDelete(heap);
+            ChangeRootNodeHandler(heap, priorityData, time, prevRootNodeStartTime);
         }
-        if (originalPtr.link != NULL) {
-            if (originalPtr.element.startTime == time) {
-                if (HeapCmp(originalPtr.element, (Data)heap->heapArr[1])) {
+        if (i < dataLen) {
+            if (dataPtr[i].startTime == time) {
+                if (HeapCmp(dataPtr[i], (Data)heap->heapArr[1])) {
                     heap->heapArr[1].lastTime = time;
                 }
-                HeapInsert(&heap, originalPtr.element);
-                originalPtr = *originalPtr.link;
+                HeapInsert(heap, dataPtr[i]);
+                i++;
             }
-            if (prevRootNodeStartTime != heap->heapArr[1].startTime) {
-                priorityData[heap->heapArr[1].priority].waitTime += time - heap->heapArr[1].lastTime;
-                prevRootNodeStartTime = heap->heapArr[1].startTime;
-            }
+            ChangeRootNodeHandler(heap, priorityData, time, prevRootNodeStartTime);
         }
-        
-        
+
     }
 
-    printf("작업수 = %d, 종료시간 = %d, 평균 실행시간 = %.2lf\n", dataLen, time - 1, (double)priorityData[0].executeTime / dataLen);
+    printf("\nPriority Scheduling의 실행 결과:\n");
+    printf("\t작업수 = %d, 종료시간 = %d, 평균 실행시간 = %.2lf\n", dataLen, time - 1,
+        (double)priorityData[0].executeTime / dataLen);
     for (int i = 10; i > 0; i--) {
-        if (!priorityData[i].numOfPriority) {
+        if (priorityData[i].numOfPriority == 0) {
             continue;
         }
-        printf("%5d %5d %.2lf\n", i, priorityData[i].numOfPriority,
+        printf("\t우선순위 %-2d: %5d %10.2lf\n", i, priorityData[i].numOfPriority,
             (double)priorityData[i].waitTime / priorityData[i].numOfPriority);
     }
+
+    delete heap;
+    delete []priorityData;
+    delete dataPtr;
 }
 
 int main() {
     readFile();
     FIFOScheduling();
-    PriorityQueue();
+    PriorityScheduling();
+
     return 0;
 }

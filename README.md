@@ -4,6 +4,8 @@
 ### [과제1](/Assignments1)
 k-means 알고리즘 구현
 
+### [과제2](/Assignment2)
+fifo, priority 스케줄 알고리즘 구현
 ---
 ## 자료구조 구현
 ### [이진트리](/BinaryTree)
